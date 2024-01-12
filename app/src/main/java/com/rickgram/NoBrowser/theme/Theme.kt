@@ -1,4 +1,4 @@
-package com.example.ghostbrowser.ui.theme
+package com.rickgram.NoBrowser.theme
 
 import android.app.Activity
 import android.os.Build

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.nobrowser"
+    namespace = "com.rickgram.NoBrowser"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.nobrowser"
+        applicationId = "com.rickgram.NoBrowser"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -29,8 +29,12 @@ android {
             )
         }
     }
-    
-    compileOptions {
+
+
+
+
+
+            compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
@@ -49,6 +53,8 @@ android {
         }
     }
 }
+
+
 
 dependencies {
 

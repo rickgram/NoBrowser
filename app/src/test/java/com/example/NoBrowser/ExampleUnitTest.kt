@@ -1,4 +1,4 @@
-package com.example.ghostbrowser
+package com.example.NoBrowser
 
 import org.junit.Test
 

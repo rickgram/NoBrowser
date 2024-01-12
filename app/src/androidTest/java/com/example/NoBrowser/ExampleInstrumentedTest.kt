@@ -1,4 +1,4 @@
-package com.example.ghostbrowser
+package com.example.NoBrowser
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

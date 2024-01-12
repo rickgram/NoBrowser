@@ -1,4 +1,4 @@
-package com.example.nobrowser
+package com.rickgram.NoBrowser
 
 import android.os.Bundle
 import android.webkit.WebView

@@ -1,4 +1,4 @@
-package com.example.ghostbrowser.ui.theme
+package com.rickgram.NoBrowser.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
