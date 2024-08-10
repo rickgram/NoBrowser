@@ -1,4 +1,4 @@
-Browser designed to simply open links from other apps. There is no URL bar to input an address. 
+Browser designed to simply open links from other apps. URL is only there to tell you where you are, add ability to share and refresh page. 
 
 <img src="https://i.ibb.co/Tw79Kwt/Screenshot-20240809-201713.png" width="240">
 
