@@ -1,6 +1,6 @@
 Browser designed to simply open links from other apps. There is no URL bar to input an address. 
 
-<img src="https://i.ibb.co/Tw79Kwt/Screenshot-20240809-201713.png" alt="Screenshot-20240809-201713" border="0">
+<img src="https://i.ibb.co/Tw79Kwt/Screenshot-20240809-201713.png" width="240">
 
 On "dumb phone"
 
