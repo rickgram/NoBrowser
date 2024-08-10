@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.GhostBrowser" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.MyTheme" parent="android:Theme.Material.Light.NoActionBar">
+
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:colorPrimaryDark">#000000</item>
+
+    </style>
+
 </resources>
