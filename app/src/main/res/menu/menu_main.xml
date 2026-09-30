@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/action_share"
-        android:title="Share"
+        android:icon="@drawable/ic_share"
+        android:title="@string/share"
         android:orderInCategory="100"
-        android:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_refresh"
-        android:title="Refresh"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/refresh"
         android:orderInCategory="200"
-        android:showAsAction="ifRoom"/>
+        app:showAsAction="ifRoom"/>
 
 </menu>

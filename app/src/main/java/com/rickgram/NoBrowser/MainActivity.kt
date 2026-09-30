@@ -1,142 +1,273 @@
 package com.rickgram.NoBrowser
 
-import android.os.Bundle
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import android.content.Intent
-import android.view.Menu
-import android.view.MenuItem
-import androidx.appcompat.widget.Toolbar
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.DownloadManager
+import android.graphics.Color
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.app.DownloadManager
+import android.os.Bundle
 import android.os.Environment
-import android.net.Uri
+import android.view.Menu
+import android.view.MenuItem
+import android.view.KeyEvent
+import android.webkit.CookieManager
+import android.webkit.URLUtil
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
-import android.content.Context
-
+import androidx.activity.addCallback
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.core.net.toUri
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var myWebView: WebView
-    private lateinit var urlTextView: TextView
-    private lateinit var toolbarTitle: TextView
+    private lateinit var webView: WebView
+    private lateinit var cursorController: WebCursorController
+    private var pendingDownload: DownloadDetails? = null
 
-    private val REQUEST_CODE = 1
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val download = pendingDownload
+        pendingDownload = null
+
+        if (granted && download != null) {
+            enqueueDownload(download)
+        } else if (!granted) {
+            Toast.makeText(this, R.string.download_permission_denied, Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         setContentView(R.layout.activity_main)
 
-        // Check for permissions
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    REQUEST_CODE
-                )
-            }
-        }
-
-        // Set up the Toolbar
         val toolbar: Toolbar = findViewById(R.id.toolbar)
+        extendToolbarBehindStatusBar(toolbar)
         setSupportActionBar(toolbar)
 
-        //Initialize WebView
-        myWebView = findViewById(R.id.webview)
-
-        // Enable JavaScript if needed
-        myWebView.settings.javaScriptEnabled = true
-
-        // Set up the WebViewClient to update the URL in the Toolbar
-        myWebView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                // Update Toolbar title with the current URL
-                supportActionBar?.title = url
-            }
-        }
-
-        // Set up the DownloadListener
-        myWebView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
-            val request = DownloadManager.Request(Uri.parse(url))
-
-            // Setting the download file type
-            request.setMimeType(mimeType)
-            // Tells the system to scan the downloaded file when completed
-            request.allowScanningByMediaScanner()
-            request.addRequestHeader("User-Agent", userAgent)
-            request.setDescription("Downloading file...")
-            request.setTitle(contentDisposition)
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            request.setDestinationInExternalPublicDir(
-                Environment.DIRECTORY_DOWNLOADS,
-                contentDisposition.substringAfter("filename=").replace("\"", "")
-            )
-
-            val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            downloadManager.enqueue(request)
-
-            Toast.makeText(applicationContext, "Downloading File...", Toast.LENGTH_LONG).show()
-        }
-
-
-        // Intent handling for receiving URLs from other apps
-        val intent = intent
-        val action = intent.action
-        val data = intent.data
-        if (action == Intent.ACTION_VIEW && data != null) {
-            myWebView.loadUrl(data.toString())
-        } else {
-            // Load a default URL if no intent data is received
-            myWebView.loadUrl("https://altl.io/")
-        }
-
+        webView = findViewById(R.id.webview)
+        cursorController = WebCursorController(
+            webView = webView,
+            overlay = findViewById(R.id.cursor_overlay)
+        )
+        configureWebView()
+        configureBackNavigation()
+        loadFromIntent(intent)
     }
 
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        loadFromIntent(intent)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        return cursorController.handleKeyEvent(event) || super.dispatchKeyEvent(event)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_share -> {
-                shareCurrentUrl()
-                true
-            }
-            R.id.action_refresh -> {
-                refreshPage()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_share -> {
+            shareCurrentUrl()
+            true
         }
+
+        R.id.action_refresh -> {
+            webView.reload()
+            true
+        }
+
+        else -> super.onOptionsItemSelected(item)
+    }
+
+    private fun extendToolbarBehindStatusBar(toolbar: Toolbar) {
+        val toolbarContentHeight = toolbar.layoutParams.height
+        val initialLeftPadding = toolbar.paddingLeft
+        val initialRightPadding = toolbar.paddingRight
+
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar) { view, insets ->
+            val topInsets = insets.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.layoutParams = view.layoutParams.apply {
+                height = toolbarContentHeight + topInsets.top
+            }
+            view.updatePadding(
+                left = initialLeftPadding + topInsets.left,
+                top = topInsets.top,
+                right = initialRightPadding + topInsets.right
+            )
+            insets
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWebView() {
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = false
+            allowContentAccess = false
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                safeBrowsingEnabled = true
+            }
+        }
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                cursorController.onPageStarted()
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                supportActionBar?.title = url
+                cursorController.installPageObserver()
+            }
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
+                if (!request.isForMainFrame || BrowserSecurity.isWebScheme(request.url.scheme)) {
+                    return false
+                }
+
+                Toast.makeText(
+                    this@MainActivity,
+                    R.string.unsupported_url_scheme,
+                    Toast.LENGTH_SHORT
+                ).show()
+                return true
+            }
+        }
+
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            if (!BrowserSecurity.isWebScheme(url.toUri().scheme)) {
+                Toast.makeText(this, R.string.unsupported_download, Toast.LENGTH_SHORT).show()
+                return@setDownloadListener
+            }
+
+            val guessedName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+            val download = DownloadDetails(
+                url = url,
+                userAgent = userAgent,
+                mimeType = mimeType,
+                fileName = BrowserSecurity.sanitizeFileName(guessedName)
+            )
+
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                pendingDownload = download
+                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            } else {
+                enqueueDownload(download)
+            }
+        }
+
+        webView.requestFocus()
+    }
+
+    private fun configureBackNavigation() {
+        onBackPressedDispatcher.addCallback(this) {
+            if (cursorController.exitFieldIfEditing()) {
+                return@addCallback
+            }
+            if (webView.canGoBack()) {
+                webView.goBack()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+    }
+
+    private fun loadFromIntent(intent: Intent) {
+        val uri = intent.data
+        if (intent.action == Intent.ACTION_VIEW && uri != null) {
+            if (BrowserSecurity.isWebScheme(uri.scheme)) {
+                webView.loadUrl(uri.toString())
+            } else {
+                Toast.makeText(this, R.string.unsupported_url_scheme, Toast.LENGTH_SHORT).show()
+                loadHomePage()
+            }
+        } else {
+            loadHomePage()
+        }
+    }
+
+    private fun loadHomePage() {
+        webView.loadUrl(DEFAULT_HOME_PAGE)
+    }
+
+    private fun enqueueDownload(download: DownloadDetails) {
+        val request = DownloadManager.Request(download.url.toUri()).apply {
+            setMimeType(download.mimeType)
+            addRequestHeader("User-Agent", download.userAgent)
+            CookieManager.getInstance().getCookie(download.url)?.let { cookie ->
+                addRequestHeader("Cookie", cookie)
+            }
+            setDescription(getString(R.string.downloading_file))
+            setTitle(download.fileName)
+            setNotificationVisibility(
+                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+            )
+            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, download.fileName)
+        }
+
+        val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadManager.enqueue(request)
+        Toast.makeText(this, R.string.download_started, Toast.LENGTH_LONG).show()
     }
 
     private fun shareCurrentUrl() {
-        val currentUrl = myWebView.url
-        if (currentUrl != null) {
-            val shareIntent = Intent().apply {
-                action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_TEXT, currentUrl)
-                type = "text/plain"
-            }
-            startActivity(Intent.createChooser(shareIntent, "Share URL via"))
+        val currentUrl = webView.url ?: return
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_TEXT, currentUrl)
+            type = "text/plain"
         }
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.share_url_via)))
     }
 
-    private fun refreshPage() {
-        myWebView.reload() // Reloads the current page in the WebView
+    private data class DownloadDetails(
+        val url: String,
+        val userAgent: String,
+        val mimeType: String,
+        val fileName: String
+    )
+
+    private companion object {
+        const val DEFAULT_HOME_PAGE = "https://altl.io/"
     }
-
-
 }

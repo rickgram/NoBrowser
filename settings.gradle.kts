@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Ghost Browser"
+rootProject.name = "NoBrowser"
 include(":app")
