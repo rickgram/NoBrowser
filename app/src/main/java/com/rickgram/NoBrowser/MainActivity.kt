@@ -3,10 +3,12 @@ package com.rickgram.NoBrowser
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
 import android.graphics.Color
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -156,16 +158,25 @@ class MainActivity : AppCompatActivity() {
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean {
-                if (!request.isForMainFrame || BrowserSecurity.isWebScheme(request.url.scheme)) {
+                if (!request.isForMainFrame) {
                     return false
                 }
 
-                Toast.makeText(
-                    this@MainActivity,
-                    R.string.unsupported_url_scheme,
-                    Toast.LENGTH_SHORT
-                ).show()
-                return true
+                return when (BrowserSecurity.classifyNavigationScheme(request.url.scheme)) {
+                    NavigationTarget.WEB -> false
+                    NavigationTarget.EXTERNAL_APP -> {
+                        openExternalApp(request.url)
+                        true
+                    }
+                    NavigationTarget.BLOCKED -> {
+                        Toast.makeText(
+                            this@MainActivity,
+                            R.string.unsupported_url_scheme,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        true
+                    }
+                }
             }
         }
 
@@ -229,6 +240,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadHomePage() {
         webView.loadUrl(DEFAULT_HOME_PAGE)
+    }
+
+    private fun openExternalApp(uri: Uri) {
+        val externalIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+
+        try {
+            startActivity(externalIntent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.no_app_for_link, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun enqueueDownload(download: DownloadDetails) {
