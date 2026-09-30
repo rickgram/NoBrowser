@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">No Browser</string>
+    <string name="share">Share</string>
+    <string name="refresh">Refresh</string>
+    <string name="share_url_via">Share URL via</string>
+    <string name="downloading_file">Downloading file…</string>
+    <string name="download_started">Downloading file…</string>
+    <string name="download_permission_denied">Storage permission is required to download files on this Android version.</string>
+    <string name="unsupported_url_scheme">Only web links can be opened.</string>
+    <string name="unsupported_download">This download type is not supported.</string>
 </resources>
